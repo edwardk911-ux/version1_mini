@@ -8,20 +8,23 @@ from get_speed_direction import detect_car_direction
 from get_wrong_way_and_speeding import wrong_way_drive, get_real_speed
 
 
-file_path = f"./videos/i_stopcar_people_reverse.mp4"
-cctv_id = "test1"
+file_path = "./videos/test2.mp4"
+cctv_id = "best_11n_newdataset_v1"
 cap = cv2.VideoCapture(file_path)
 
 
 # 프레임 속도를 1초를 환산
 fps = cap.get(cv2.CAP_PROP_FPS)
 # 속력을 계산할 때, 사용한 시간 7프레임 간격으로 속력 계산
-one_second = 1 * 5 / fps
+one_second = 1 * 16 / fps
 
 
-model = YOLO("best20.pt")
-model1 = YOLO("yolov8n.pt")
-# 실시간으로 6초 180개의 frame을 저장할 리스트 dq 설정
+model = YOLO("final_tune1.pt")
+print("Classes:", model.names)
+# model1 = YOLO("yolov8n.pt")
+
+#  Classes: {0: 'bus', 1: 'car', 2: 'motorcycle', 3: 'people', 4: 'person', 5: 'truck'}
+# 실시간으로 4초 120개의 frame을 저장할 리스트 dq 설정
 dq = deque(maxlen=120)
 
 frame_count = 0
@@ -32,12 +35,13 @@ vehicle_id = {}
 recording_start = {}
 
 df = pd.DataFrame(
-    columns=["type", "direction", "speed", "datetime", "illegal", "file_name"]
+    columns=["id", "type", "direction", "speed", "datetime", "illegal", "file_name"]
 )
 
 
 while cap.isOpened():
     frame_count += 1
+    # print(frame_count)
     direction = None
     if frame_count % 2 != 0:
         continue
@@ -52,40 +56,46 @@ while cap.isOpened():
     # =================================================================
 
     # # 사람과 오토바이 탐지 YOLO 모델 적용
-    detect_motorcycle = model1.track(frame, verbose=False, persist=True, classes=[0, 3])
+    # detect_motorcycle = model1.track(frame, verbose=False, persist=True, classes=[0, 3])
 
-    for box in detect_motorcycle[0].boxes:
-        if box.id is None:
-            continue
-        else:
-            M_id = int(box.id)
-            cls = int(box.cls)
-            mx, my, _, _ = box.xywh[0].tolist()
-            date_time = datetime.now()
-            file_name = f"motorcycle_people_{date_time.strftime("%Y_%m_%d_%H_%M_%S")}"
-            # column = ["type", "direction", "speed", "datetime", "illegal", "file_name"]
-            recording_start[M_id] = [(frame_count + 60), file_name, mx, my]
+    # for box in detect_motorcycle[0].boxes:
+    #     if box.id is None:
+    #         continue
+    #     else:
+    #         M_id = int(box.id)
+    #         cls = int(box.cls)
+    #         mx, my, _, _ = box.xywh[0].tolist()
+    #         date_time = datetime.now()
+    #         file_name = f"motorcycle_people_{date_time.strftime("%Y_%m_%d_%H_%M_%S")}"
+    #         # column = ["type", "direction", "speed", "datetime", "illegal", "file_name"]
+    #         recording_start[M_id] = [(frame_count + 60), file_name, mx, my]
 
-            # 불법차량 빨간색 원으로 표시할 좌표
-            try:
-                recording_start[M_id][2] = mx
-                recording_start[M_id][3] = my
-            except:
-                pass
+    #         # 불법차량 빨간색 원으로 표시할 좌표
+    #         try:
+    #             recording_start[M_id][2] = mx
+    #             recording_start[M_id][3] = my
+    #         except:
+    #             pass
 
-            if cls == 0:
-                print("경고! 고속도로 위에서 사람 발견")
+    #         if cls == 0:
+    #             print("경고! 고속도로 위에서 사람 발견")
 
-            elif cls == 3:
-                print("경고! 고속도로 위에서 오토바이 발견")
+    #         elif cls == 3:
+    #             print("경고! 고속도로 위에서 오토바이 발견")
+
+    # 원본 프레임을 720x480으로 리사이즈
+    # frame = cv2.resize(frame, (720, 480))
+
 
     # 분석하지 않는 화면 하얀색으로 전처리
 
-    # frame[:150, :] = 255  # 화면 상단 하얀색으로 전처리
-
+    # frame[:450, :] = 0  # 화면 상단 하얀색으로 전처리
+    frame[:200, :] = 0
     results = model.track(
-        frame, verbose=False, conf=0.7, persist=True, classes=[0, 1, 2, 3, 4]
+        frame, verbose=False, persist=True, conf=0.4,classes=[0, 1, 2, 3, 4, 5, 7], tracker="botsort.yaml"
     )
+
+    # conf=0.5 , tracker="botsort.yaml"
     result = results[0].plot()
     for box in results[0].boxes:
 
@@ -115,7 +125,7 @@ while cap.isOpened():
                 boolean_1, stopped_id = detect_stopped_car
                 print(f"차량 번호 : {stopped_id}: 고속도로 위에 주정차되어 있습니다.")
 
-                # 현시간을 기준으로 전후 3초, 총 6초간 동영상 녹화
+                # 현시간을 기준으로 전후 2초, 총 4초간 동영상 녹화
                 stopped_car_datetime = datetime.now()
                 # file_name 예시 parking_25-12-19_13:00:00.mp4
                 file_name = f"parking[{tid}]_{stopped_car_datetime.strftime("%Y_%m_%d_%H_%M_%S")}"
@@ -127,38 +137,61 @@ while cap.isOpened():
 
         # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         # 탐지 존 영역 수정
-        in_zone = 343 < cy < 356  # a, c, h           cctv  13차이 195   line = 350
-        # in_zone = 300 < cy < 313  # b, e, f, g      cctv  13차이 195   line = 306
-        # in_zone = 243 < c_y < 256  # d i             cctv  13차이 195   line = 250
+
+        # ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+
+        # in_zone = 300 < cy < 330  # test1 video        
+        in_zone = 510 < cy < 540  # test2 video
+        # ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
         # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
         # ==========================================================================
         # ==============================  차량 방향 및 속력 탐지 =============================
         # ==========================================================================
+        # in_zone 범위를 시각적으로 표시
+
+         # ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+         #test1 video
+        # cv2.line(result, (0, 300), (1920, 300), (0, 255, 0), 2)  # 상단 경계선
+        # cv2.line(result, (0, 320), (1920, 320), (0, 255, 0), 2)  # 하단 경계선
+        
+        #test2 video
+        cv2.line(result, (0, 510), (1920, 510), (0, 255, 0), 2)  # 상단 경계선
+        cv2.line(result, (0, 540), (1920, 540), (0, 255, 0), 2)  # 하단 경계선
+         # ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+
         if tid not in vehicle_id and in_zone:
-            vehicle_id[tid] = 0
+            vehicle_id[tid] = tid
             # 프로그램 작동여부 1번 확인소
             # print(f"처음 Id: {tid}, y1의 좌표: {cy}")
-        result_dir_speed = detect_car_direction(tid, cx, cy, frame_count, one_second)
+            result_dir_speed = detect_car_direction(
+                tid, cx, cy, frame_count, one_second
+            )
 
-        if result_dir_speed is None:
+        if tid in vehicle_id.keys():
+            result_dir_speed = detect_car_direction(
+                tid, cx, cy, frame_count, one_second
+            )
 
-            continue
+            if result_dir_speed is None:
 
-        else:
-            cls = int(box.cls)
-            direction, speed_px = result_dir_speed
-            # 프로그램 작동여부 확인 2번쩨 포인트
-            # print(speed_px)
-            data_time = f"{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}"
-            # column = ["type", "direction", "speed", "datetime", "illegal", "file_name"]
-            cols = ["type", "direction", "speed", "datetime"]
+                continue
 
-            df.loc[tid, "type"] = cls
-            df.loc[tid, "direction"] = direction
-            df.loc[tid, "speed"] = speed_px
-            df.loc[tid, "datetime"] = data_time
+            else:
+                cls = int(box.cls)
+                direction, speed_px = result_dir_speed
+                # 프로그램 작동여부 확인 2번쩨 포인트
+                # print(speed_px)
+                data_time = f"{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}"
+                # column = ["type", "direction", "speed", "datetime", "illegal", "file_name"]
+                cols = ["type", "direction", "speed", "datetime"]
+                df.loc[tid, "id"] = tid
+                df.loc[tid, "type"] = cls
+                df.loc[tid, "direction"] = direction
+                df.loc[tid, "speed"] = speed_px
+                df.loc[tid, "datetime"] = data_time
+                del vehicle_id[tid]
 
         # ==========================================================================
         # ==============================  역방향 탐지와 및 속력 보정 =============================
@@ -166,51 +199,55 @@ while cap.isOpened():
 
         # # 역방향 차량 탐지 및 속력 보정후 실제 속력
         # # 상행선 하행선의 차량 데이터 50개를 활용하여 최근접분류를 통해 역방향을 찾는다.
-        if df.loc[tid, "speed"] is not None:
-            car_direction = df.loc[tid, "direction"]
-            speed_px1 = df.loc[tid, "speed"]
-            cls = df.loc[tid, "type"]
+        try:
+            if df.loc[tid, "speed"] is not None:
+                car_direction = df.loc[tid, "direction"]
+                speed_px1 = df.loc[tid, "speed"]
+                cls = df.loc[tid, "type"]
 
-            detect_wrong_way_car = wrong_way_drive(
-                tid, cls, cx, cy, car_direction, speed_px1
-            )
+                detect_wrong_way_car = wrong_way_drive(
+                    tid, cls, cx, cy, car_direction, speed_px1
+                )
 
-            # 아래의 car_direction은 차선과 관계없는 실제 차량의 주행방향
-            # 최근접 분류 머신런닝을 통해 역주행 여부 판단
+                # 아래의 car_direction은 차선과 관계없는 실제 차량의 주행방향
+                # 최근접 분류 머신런닝을 통해 역주행 여부 판단
 
-            if detect_wrong_way_car:
-                print(f"경고!! 역주행 차량{tid}가 발견되었습니다.")
+                if detect_wrong_way_car:
+                    print(f"경고!! 역주행 차량{tid}가 발견되었습니다.")
 
-                wrong_way_datetime = datetime.now()
-                # file_name 예시 parking_25-12-19_13:00:00.mp4
+                    wrong_way_datetime = datetime.now()
+                    # file_name 예시 parking_25-12-19_13:00:00.mp4
 
-                file_name = f"wrong_way[{tid}]_{wrong_way_datetime.strftime("%Y_%m_%d_%H_%M_%S")}"
-                recording_start[tid] = [(frame_count + 60), file_name, cx, cy]
+                    file_name = f"wrong_way[{tid}]_{wrong_way_datetime.strftime("%Y_%m_%d_%H_%M_%S")}"
+                    recording_start[tid] = [(frame_count + 100), file_name, cx, cy]
 
-                # column = ["type", "direction", "speed", "datetime", "illegal", "file_name"]
-                df.loc[tid, ["illegal", "file_name"]] = [
-                    "wrong_way",
-                    f"{file_name}.mp4",
-                ]
+                    # column = ["type", "direction", "speed", "datetime", "illegal", "file_name"]
+                    df.loc[tid, ["illegal", "file_name"]] = [
+                        "wrong_way",
+                        f"{file_name}.mp4",
+                    ]
 
-                # recording_start[tid][2] = cx
-                # recording_start[tid][3] = cy
-            # 차선에 따른 속력보정후 실제 속력
-            real_speed = get_real_speed(cx, cy, car_direction)
-            if real_speed is None:
-                df.loc[tid, "speed"] = "learning"
+                    # recording_start[tid][2] = cx
+                    # recording_start[tid][3] = cy
+                # 차선에 따른 속력보정후 실제 속력
+                real_speed = get_real_speed(cx, cy, car_direction)
+                if real_speed is None:
+                    df.loc[tid, "speed"] = "learning"
 
-            else:
+                else:
 
-                df.loc[tid, "speed"] = speed_px1 * real_speed
-                # print(cls, df.loc[tid, "speed"])
+                    df.loc[tid, "speed"] = speed_px1 * real_speed
+                    # print(cls, df.loc[tid, "speed"])
+
+        except:
+            pass
 
         # 불법차량 빨간색 원으로 표시할 좌표  # 188, 189줄 참고
-        # try:
-        #     recording_start[tid][2] = cx
-        #     recording_start[tid][3] = cy
-        # except:
-        #     pass
+        try:
+            recording_start[tid][2] = cx
+            recording_start[tid][3] = cy
+        except:
+            pass
 
     for key in recording_start.keys():
         cx = int(recording_start[key][2])

@@ -21,18 +21,18 @@ def wrong_way_drive(tid, cls, cx, cy, car_direction, speed_px1):
     speed_constant = 110 / speed_px1
 
     if car_direction == "up":
-        if cls == 4:
-            df_px_speed.loc[tid, "up_x"] = cx
-            df_px_speed.loc[tid, "up_y"] = cy
-            df_px_speed.loc[tid, "up_target"] = speed_constant
+
+        df_px_speed.loc[tid, "up_x"] = cx
+        df_px_speed.loc[tid, "up_y"] = cy
+        df_px_speed.loc[tid, "up_target"] = speed_constant
         dq_up.append([cx, cy])
         direction = 1
 
     elif car_direction == "down":
-        if cls == 4:
-            df_px_speed.loc[tid, "down_x"] = cx
-            df_px_speed.loc[tid, "down_y"] = cy
-            df_px_speed.loc[tid, "down_target"] = speed_constant
+
+        df_px_speed.loc[tid, "down_x"] = cx
+        df_px_speed.loc[tid, "down_y"] = cy
+        df_px_speed.loc[tid, "down_target"] = speed_constant
 
         dq_down.append([cx, cy])
         direction = 0
@@ -51,7 +51,7 @@ def wrong_way_drive(tid, cls, cx, cy, car_direction, speed_px1):
 
     result = knn.predict([[cx, cy]])
     # 탐지 방향과 근접분류 방향이 같지 않으면 역주행으로 간주
-    if result[0] != direction and (speed_px1 > 6):
+    if result[0] != direction and (speed_px1 > 3):
         detect_wrong_way = True
         return detect_wrong_way, tid
     else:
@@ -68,7 +68,7 @@ def get_real_speed(cx, cy, direction):
     global df_px_speed, num
     up_num: int = df_px_speed["up_target"].count()
     down_num: int = df_px_speed["down_target"].count()
-    print("학습한 자동차의 수, 상행선/하행선:", up_num, down_num)
+    # print("학습한 자동차의 수, 상행선/하행선:", up_num, down_num)
     # df_px_speed[tid, ["up_x","up_y" , "up_target"]]
 
     if up_num < 30 or down_num < 30:
