@@ -9,7 +9,7 @@ from get_wrong_way_and_speeding import wrong_way_drive, get_real_speed
 
 
 file_path = "./videos/test2.mp4"
-cctv_id = "best_11n_newdataset_v1"
+cctv_id = "final_tune1_v2_no_conf"
 cap = cv2.VideoCapture(file_path)
 
 
@@ -19,9 +19,9 @@ fps = cap.get(cv2.CAP_PROP_FPS)
 one_second = 1 * 16 / fps
 
 
-model = YOLO("final_tune1.pt")
+model = YOLO("yolo11n.pt")
 print("Classes:", model.names)
-# model1 = YOLO("yolov8n.pt")
+
 
 #  Classes: {0: 'bus', 1: 'car', 2: 'motorcycle', 3: 'people', 4: 'person', 5: 'truck'}
 # 실시간으로 4초 120개의 frame을 저장할 리스트 dq 설정
@@ -51,51 +51,16 @@ while cap.isOpened():
     if not success:
         break
 
-    # =================================================================
-    # =======================  오토바이 & 사람 탐지  =====================
-    # =================================================================
-
-    # # 사람과 오토바이 탐지 YOLO 모델 적용
-    # detect_motorcycle = model1.track(frame, verbose=False, persist=True, classes=[0, 3])
-
-    # for box in detect_motorcycle[0].boxes:
-    #     if box.id is None:
-    #         continue
-    #     else:
-    #         M_id = int(box.id)
-    #         cls = int(box.cls)
-    #         mx, my, _, _ = box.xywh[0].tolist()
-    #         date_time = datetime.now()
-    #         file_name = f"motorcycle_people_{date_time.strftime("%Y_%m_%d_%H_%M_%S")}"
-    #         # column = ["type", "direction", "speed", "datetime", "illegal", "file_name"]
-    #         recording_start[M_id] = [(frame_count + 60), file_name, mx, my]
-
-    #         # 불법차량 빨간색 원으로 표시할 좌표
-    #         try:
-    #             recording_start[M_id][2] = mx
-    #             recording_start[M_id][3] = my
-    #         except:
-    #             pass
-
-    #         if cls == 0:
-    #             print("경고! 고속도로 위에서 사람 발견")
-
-    #         elif cls == 3:
-    #             print("경고! 고속도로 위에서 오토바이 발견")
 
     # 원본 프레임을 720x480으로 리사이즈
-    # frame = cv2.resize(frame, (720, 480))
+    frame = cv2.resize(frame, (720, 480))
 
 
-    # 분석하지 않는 화면 하얀색으로 전처리
-
-    # frame[:450, :] = 0  # 화면 상단 하얀색으로 전처리
-    frame[:200, :] = 0
+    frame[:100, :] = 0
     results = model.track(
-        frame, verbose=False, persist=True, conf=0.4,classes=[0, 1, 2, 3, 4, 5, 7], tracker="botsort.yaml"
+        frame, verbose=False, persist=True, conf=0.3, classes=[0, 1, 2, 3, 4, 5, 7], tracker="bytetrack.yaml"
     )
 
-    # conf=0.5 , tracker="botsort.yaml"
     result = results[0].plot()
     for box in results[0].boxes:
 
@@ -105,7 +70,43 @@ while cap.isOpened():
         # 차량 ID와 그 차량의 중심값
         tid = int(box.id)
 
+        cls = int(box.cls)
+
         cx, cy, _, _ = box.xywh[0].tolist()
+
+        # =================================================================
+        # =======================  오토바이 & 사람 탐지  =====================
+        # =================================================================
+
+        if cls == 0:
+            print("경고! 고속도로 위에서 사람 발견")
+            date_time = datetime.now()
+            file_name = f"person_{date_time.strftime('%Y_%m_%d_%H_%M_%S')}"                 
+            # column = ["type", "direction", "speed", "datetime", "illegal", "file_name"]
+            recording_start[tid] = [(frame_count + 60), file_name, cx, cy]
+
+            # 불법차량 빨간색 원으로 표시할 좌표
+            try:
+                recording_start[tid][2] = cx
+                recording_start[tid][3] = cy
+            except:
+                pass
+
+
+        if cls == 3:
+            print("경고! 고속도로 위에서 오토바이 발견")
+            date_time = datetime.now()
+            file_name = f"motorcycle_{date_time.strftime('%Y_%m_%d_%H_%M_%S')}"                 
+            # column = ["type", "direction", "speed", "datetime", "illegal", "file_name"]
+            recording_start[tid] = [(frame_count + 60), file_name, cx, cy]
+
+            # 불법차량 빨간색 원으로 표시할 좌표
+            try:
+                recording_start[tid][2] = cx
+                recording_start[tid][3] = cy
+            except:
+                pass
+
 
         # =================================================================
         # ===============  차량 속도데이터 수집을 시작합니다. ===================
@@ -141,7 +142,7 @@ while cap.isOpened():
         # ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
         # in_zone = 300 < cy < 330  # test1 video        
-        in_zone = 510 < cy < 540  # test2 video
+        in_zone = 250 < cy < 260  # test2 video
         # ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
         # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -153,12 +154,12 @@ while cap.isOpened():
 
          # ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
          #test1 video
-        # cv2.line(result, (0, 300), (1920, 300), (0, 255, 0), 2)  # 상단 경계선
-        # cv2.line(result, (0, 320), (1920, 320), (0, 255, 0), 2)  # 하단 경계선
+        # cv2.line(result, (0, 200), (720, 200), (0, 255, 0), 2)  # 상단 경계선
+        # cv2.line(result, (0, 210), (720, 210), (0, 255, 0), 2)  # 하단 경계선
         
         #test2 video
-        cv2.line(result, (0, 510), (1920, 510), (0, 255, 0), 2)  # 상단 경계선
-        cv2.line(result, (0, 540), (1920, 540), (0, 255, 0), 2)  # 하단 경계선
+        cv2.line(result, (0, 250), (720, 250), (0, 255, 0), 2)  # 상단 경계선
+        cv2.line(result, (0, 260), (720, 260), (0, 255, 0), 2)  # 하단 경계선
          # ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
         if tid not in vehicle_id and in_zone:
@@ -254,6 +255,7 @@ while cap.isOpened():
         cy = int(recording_start[key][3])
         # 불법차량 녹화 작동여부 확인소 3번째
         # print(key, cx, cy, recording_start[key])
+        cv2.circle(frame, (cx, cy), 20, (0, 0, 255), 3)
         cv2.circle(result, (cx, cy), 20, (0, 0, 255), 3)
 
     # 리코딩 시작:  아이디 그리고 불법 종류 별로
@@ -276,7 +278,7 @@ while cap.isOpened():
     cv2.imshow("frame", result)
 
     # 녹화할 영상 dq에  담기
-    dq.append(result)
+    dq.append(frame)
 
     if cv2.waitKey(1) & 0xFF == ord("p"):
         print(df.tail())
