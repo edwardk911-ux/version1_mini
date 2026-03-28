@@ -2,7 +2,7 @@ venv
 .venv
 
 videos
-results
+
 
 *.pt
 *.pth
